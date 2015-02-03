@@ -7,7 +7,7 @@ import cv2.cv as cv
 import sys
 
 INPUT_IMG = "image.png"
-PAYLOAD = "mal_server.exe"
+PAYLOAD = "mal_server"
 OUTPUT_IMG = "mal.png"
 
 #Hide payload in image, output new stego image
